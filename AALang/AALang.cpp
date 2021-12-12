@@ -218,6 +218,23 @@ struct AALang
 			}
 		));
 		registerFunction(
+			new Function("ifelse", 3, [this](CallStack* p) {
+				int eval = p->top()->fValue;
+				p->pop();
+				if (!eval)
+					p->pop();
+
+				Variable* block = p->top();
+				executeBlock(block->sValue);
+
+				if (eval)
+					p->pop();
+
+				p->pop();
+				return new Variable();
+				}
+		));
+		registerFunction(
 			new Function("print", 1, [](CallStack* p) {
 				std::cout << p->top()->toString() << std::endl;
 				p->pop();
@@ -237,6 +254,15 @@ struct AALang
 				}
 				return new Variable();
 			}
+		));
+		registerFunction(
+			new Function("equals", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 == v2);
+				}
 		));
 		registerFunction(
 			new Function("add", 2, [](CallStack* p) {
@@ -636,10 +662,10 @@ struct AALang
 		executeTokens(&tokens);
 
 		//std::cout << std::endl;
-		/*for (auto& i : tokens)
+		for (auto& i : tokens)
 		{
 			std::cout << "" << i.value << "" << "\t(" << i.typeToString() <<  ")" << std::endl;
-		}*/
+		}
 
 		return "";
 	}
@@ -651,7 +677,7 @@ struct AALang
 
 void preParse(const char *data, size_t size, Program* p)
 {
-	p->push_back("");
+	/*p->push_back("");
 	for (int i = 0; i < size; ++i)
 	{
 		if(data[i] != '\n' && data[i] != '\r')
@@ -659,7 +685,32 @@ void preParse(const char *data, size_t size, Program* p)
 
 		if (data[i] == '\n')
 			p->push_back("");
+	}*/
+
+	int blockCount = 0;
+	int inQuote = 0;
+	p->push_back("");
+	for (int i = 0; i < size; ++i)
+	{
+		if (!inQuote)
+		{
+			if (data[i] == '{')
+				blockCount++;
+			else if (data[i] == '}')
+				blockCount--;
+		}
+		if (blockCount == 0)
+		{
+			if (data[i] == '"')
+				inQuote = !inQuote;
+		}
+		if (data[i] != '\n' && data[i] != '\r')
+			p->back() += data[i];
+		if (data[i] == ';' && !inQuote && blockCount == 0)
+			p->push_back("");
 	}
+	p->pop_back();
+
 }
 
 void parseDocument(std::filesystem::path filepath, Program *p)

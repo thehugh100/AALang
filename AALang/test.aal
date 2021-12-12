@@ -1,5 +1,10 @@
-a = { print("this is in a block") };
-b = a;
-b;
-if(1, b);
-if(0, { print("this will never print"); });
+a = 2;
+ifelse(equals(a, 3),
+{
+    print("a=3");
+},
+{
+    print("a!=3");
+});
+
+print(cmd("whoami"));
