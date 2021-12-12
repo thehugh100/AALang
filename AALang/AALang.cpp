@@ -10,10 +10,17 @@
 struct Variable
 {
 	enum class VariableType {
-		P_String = 0,
-		P_Float
+		P_NULL = 0,
+		P_String,
+		P_Float,
 	};
 
+	Variable()
+	{
+		type = VariableType::P_NULL;
+		sValue = "";
+		fValue = 0;
+	}
 	Variable(std::string value)
 	{
 		type = VariableType::P_String;
@@ -29,6 +36,9 @@ struct Variable
 
 	std::string toString()
 	{
+		if (type == VariableType::P_NULL)
+			return "NULL";
+
 		if (type == VariableType::P_String)
 			return sValue;
 
@@ -124,7 +134,7 @@ struct CallStack
 	std::stack<Variable*> cs;
 };
 
-typedef std::function<void(CallStack*)> Action;
+typedef std::function<Variable*(CallStack*)> Action;
 
 struct Function
 {
@@ -133,16 +143,18 @@ struct Function
 	{
 	}
 
-	void execute(CallStack *p)
+	Variable* execute(CallStack *p)
 	{
 		if (p->size() >= parameterCount)
 		{
-			action(p);
+			return action(p);
 		}
 		else
 		{
 			std::cout << "Runtime Error: Call to " << identifier << "() failed. Too few stack items for call." << std::endl;
 		}
+
+		return nullptr;
 	}
 
 	std::string identifier;
@@ -158,7 +170,7 @@ bool isIdentifierChar(char v)
 }
 bool isNumericChar(char v)
 {
-	return ((v >= '0' && v <= '9') || v == '.');
+	return ((v >= '0' && v <= '9') || v == '.' || v == '-');
 }
 
 struct AALang
@@ -173,8 +185,8 @@ struct AALang
 		registerFunction(
 			new Function("print", 1, [](CallStack* p) {
 				std::cout << p->top()->toString() << std::endl;
-
 				p->pop();
+				return new Variable();
 			}
 		));
 		registerFunction(
@@ -187,26 +199,35 @@ struct AALang
 				{
 					std::cout << p->top()->toString() << std::endl;
 					p->pop();
-
 				}
-
+				return new Variable();
+			}
+		));
+		registerFunction(
+			new Function("add", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 + v2);
 			}
 		));
 	}
 
-	void call(std::string identifier)
+	Variable* call(std::string identifier)
 	{
 		if (functions.find(identifier) != functions.end())
 		{
 			if (!callStack.empty())
 			{
-				functions.at(identifier)->execute(&callStack);
+				return functions.at(identifier)->execute(&callStack);
 			}
 			else
 			{
 				std::cout << "Runtime Error: Callstack is empty" << std::endl;
 			}
 		}
+		return nullptr;
 	}
 
 	Function* registerFunction(Function* newFunc)
@@ -305,22 +326,27 @@ struct AALang
 		}
 	}
 
-	Variable* processImmediate(Token in)
+	Variable* processImmediate(Token in, bool createIfNotExists = false)
 	{
 		Variable* immediate = nullptr;
 		if (in.type == Token::TokenType::T_Identifier)
 		{
-			if (functions.find(in.value) != functions.end())
-			{
-				std::cout << "Parse Error: immiate functions not yet supported..." << std::endl;
-			}
-			else if (variables.find(in.value) != variables.end())
+			if (variables.find(in.value) != variables.end())
 			{
 				immediate = variables[in.value];
 			}
 			else
 			{
-				std::cout << "Parse Error: Unknown Identifier '" << in.value << "'" << std::endl;
+				if (createIfNotExists)
+				{
+					immediate = assignVariable(in.value, new Variable(0));
+				}
+				else
+				{
+					//return NULL
+					immediate = new Variable();
+					std::cout << "Parse Error: Unknown Identifier '" << in.value << "'" << std::endl;
+				}
 			}
 		}
 		else if (in.type == Token::TokenType::T_Number)
@@ -339,9 +365,131 @@ struct AALang
 		return immediate;
 	}
 
+	Variable* evaluateExpression(TokenList* list, bool createIfNotExists = false)
+	{
+		// return null if expression is empty
+		if (list->empty())
+		{
+			return new Variable();
+		}
+		else
+		{
+			bool isFunction = 0;
+			// is immediate value ?
+			if (list->size() == 1)
+			{
+				return processImmediate(list->at(0), createIfNotExists);
+			}
+			else
+			{
+				if (list->size() >= 3)
+				{
+					if (list->at(0).type == Token::TokenType::T_Identifier && list->at(1).type == Token::TokenType::T_OpenParenthesis)
+					{
+						isFunction = true;
+						int parenthesisCount = 0;
+						std::string identifier = list->at(0).value;
+
+						TokenList subList;
+						std::stack<Variable*> stack;
+
+						for (int i = 2; i < list->size()-1; ++i)
+						{
+							auto currentType = list->at(i).type;
+
+							if (currentType == Token::TokenType::T_OpenParenthesis)
+							{
+								parenthesisCount++;
+							}
+							else if (currentType == Token::TokenType::T_CloseParenthesis)
+							{
+								parenthesisCount--;
+							}
+							
+
+							if (parenthesisCount == 0)
+							{
+								if (currentType == Token::TokenType::T_Comma)
+								{
+									stack.push(evaluateExpression(&subList));
+									subList.clear();
+								}
+								else
+								{
+									subList.push_back(list->at(i));
+								}
+							}
+							else
+							{
+								subList.push_back(list->at(i));
+							}
+						}
+
+						stack.push(evaluateExpression(&subList));
+						subList.clear();
+
+						if (parenthesisCount == 0)
+						{
+							while (!stack.empty())
+							{
+								callStack.push(stack.top());
+								stack.pop();
+							}
+							return call(identifier);
+						}
+						else
+						{
+							std::cout << "Parse Error: Parenthesis mismatch" << std::endl;
+							return nullptr;
+						}
+					}
+				}
+			}
+		}
+		return nullptr;
+	}
+
 	void executeTokens(TokenList* list)
 	{
-		std::string lParamIdentifier = "";
+		TokenList lParam;
+		TokenList rParam;
+		bool foundlParam = false;
+		bool assignment = false;
+		for (auto& i : *list)
+		{
+			if (i.type == Token::TokenType::T_AssignmentOperator)
+			{
+				foundlParam = true;
+				assignment = true;
+			}
+			else
+			{
+				if (i.type == Token::TokenType::T_EndOfLine)
+					continue;
+
+				if (!foundlParam)
+					lParam.push_back(i);
+				else
+					rParam.push_back(i);
+			}
+		}
+
+		Variable* lParamV = evaluateExpression(&lParam, true);
+		Variable* rParamV = evaluateExpression(&rParam);
+
+		if (assignment)
+		{
+			lParamV->type = rParamV->type;
+			lParamV->fValue = rParamV->fValue;
+			lParamV->sValue = rParamV->sValue;
+		}
+		else
+		{
+			if(lParamV)
+				std::cout << ">> " << lParamV->toString() << std::endl;
+		}
+
+		/*std::string lParamIdentifier = "";
 		Variable* lParamV = nullptr;
 		bool lParamIsVar = false;
 		bool lParamIsFunc = false;
@@ -459,6 +607,7 @@ struct AALang
 				}
 			}
 		}
+		*/
 	}
 
 	std::string executeLine(std::string line)
