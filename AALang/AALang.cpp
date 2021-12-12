@@ -6,6 +6,10 @@
 #include <functional>
 #include <filesystem>
 #include <fstream>
+#include <cstdio>
+#include <memory>
+#include <stdexcept>
+#include <array>
 
 struct Variable
 {
@@ -212,6 +216,60 @@ struct AALang
 				return new Variable(v1 + v2);
 			}
 		));
+		registerFunction(
+			new Function("sub", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 - v2);
+			}
+		));
+		registerFunction(
+			new Function("mul", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 * v2);
+			}
+		));
+		registerFunction(
+			new Function("div", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 / v2);
+			}
+		));
+		registerFunction(
+			new Function("mod", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(((int)v1 % (int)v2));
+			}
+		));
+		registerFunction(
+			new Function("cmd", 1, [](CallStack* p) {
+				std::string cmd = p->top()->sValue;
+				p->pop();
+
+				std::array<char, 128> buffer;
+				std::string result;
+				std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen(cmd.c_str(), "r"), _pclose);
+				if (!pipe) {
+					throw std::runtime_error("popen() failed!");
+				}
+				while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+					result += buffer.data();
+				}
+
+				return new Variable(result);
+			}
+		));
 	}
 
 	Variable* call(std::string identifier)
@@ -232,7 +290,7 @@ struct AALang
 
 	Function* registerFunction(Function* newFunc)
 	{
-		std::cout << "Registered Function: " << newFunc->identifier << "()" << std::endl;
+		//std::cout << "Registered Function: " << newFunc->identifier << "()" << std::endl;
 		functions[newFunc->identifier] = newFunc;
 
 		return newFunc;
@@ -488,126 +546,6 @@ struct AALang
 			if(lParamV)
 				std::cout << ">> " << lParamV->toString() << std::endl;
 		}
-
-		/*std::string lParamIdentifier = "";
-		Variable* lParamV = nullptr;
-		bool lParamIsVar = false;
-		bool lParamIsFunc = false;
-		bool lParam = 0;
-		bool assignment = false;
-
-		Variable* rParamV = nullptr;
-		bool rParamIsFunc = false;
-		bool rParam = 0;
-
-		std::vector<Variable*> params;
-
-		bool pushing = false;
-
-		for (auto& i : *list)
-		{
-			if (!lParam)
-			{
-				if (i.type == Token::TokenType::T_Identifier)
-				{
-					lParamIdentifier = i.value;
-
-					if (functions.find(i.value) != functions.end())
-					{
-						lParamIsFunc = true;
-						lParam = true;
-						continue;
-					}
-					if (variables.find(i.value) != variables.end())
-					{
-						lParamV = variables[i.value];
-						lParamIsVar = true;
-						lParam = true;
-						continue;
-					}
-					else
-					{
-						lParamV = assignVariable(i.value, new Variable(0));
-						lParamIsVar = true;
-						lParam = true;
-					}
-				}
-			}
-			else
-			{
-				if (i.type == Token::TokenType::T_AssignmentOperator)
-				{
-					assignment = true;
-					continue;
-				}
-				else if (i.type == Token::TokenType::T_EndOfLine)
-				{
-					break;
-				}
-				else if (i.type == Token::TokenType::T_OpenParenthesis)
-				{
-					if (!assignment && !lParamIsFunc)
-					{
-						std::cout << "Parse Error: Unexpected Token '(', " << lParamIdentifier << " is not a function." << std::endl;
-						break;
-					}
-					pushing = true;
-					continue;
-				}
-				else if (i.type == Token::TokenType::T_Comma)
-				{
-					continue;
-				}
-				else if (i.type == Token::TokenType::T_CloseParenthesis)
-				{
-					
-					for (int e = params.size() - 1; e >= 0; e--)
-					{
-						callStack.push(params[e]);
-					}
-
-					pushing = false;
-					continue;
-				}
-				else
-				{
-					rParam = true;
-					rParamV = processImmediate(i);
-					if (pushing)
-					{
-						params.push_back(rParamV);
-					}
-				}
-			}
-		}
-
-		if (assignment)
-		{
-			if (lParam && rParam)
-			{
-				lParamV->type = rParamV->type;
-				lParamV->fValue = rParamV->fValue;
-				lParamV->sValue = rParamV->sValue;
-			}
-		}
-		else
-		{
-			if (lParam)
-			{
-				if (lParamIsFunc)
-				{
-					call(lParamIdentifier);
-				}
-				else
-				{
-					if (lParamV)
-					{
-						std::cout << lParamV->toString() << std::endl;
-					}
-				}
-			}
-		}
-		*/
 	}
 
 	std::string executeLine(std::string line)
@@ -617,11 +555,11 @@ struct AALang
 
 		executeTokens(&tokens);
 
-		std::cout << std::endl;
-		for (auto& i : tokens)
+		//std::cout << std::endl;
+		/*for (auto& i : tokens)
 		{
 			std::cout << "" << i.value << "" << "\t(" << i.typeToString() <<  ")" << std::endl;
-		}
+		}*/
 
 		return "";
 	}
