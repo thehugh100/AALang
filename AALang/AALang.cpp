@@ -477,8 +477,7 @@ struct AALang
 
 		for (auto& i : t)
 		{
-			std::cout << i << std::endl;
-			std::cout << executeLine(i) << std::endl;
+			executeLine(i);
 		}
 	}
 
@@ -668,10 +667,10 @@ struct AALang
 		executeTokens(&tokens);
 
 		//std::cout << std::endl;
-		for (auto& i : tokens)
+		/*for (auto& i : tokens)
 		{
 			std::cout << "" << i.value << "" << "\t(" << i.typeToString() <<  ")" << std::endl;
-		}
+		}*/
 
 		return "";
 	}
@@ -762,8 +761,7 @@ int main()
 	int lineNum = 1;
 	for (auto& i : program)
 	{
-		std::cout << i << std::endl;
-		std::cout << aaLang->executeLine(i) << std::endl;
+		aaLang->executeLine(i);
 	}
 
 }

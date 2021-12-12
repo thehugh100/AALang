@@ -1,13 +1,14 @@
 
 {
-    a = 2;
-    ifelse(equals(a, 3),
     {
-        print("a=3");
-    },
-    {
-        print("a!=3");
-    });
-
+        a = 2;
+        ifelse(equals(a, 3),
+        {
+            print("a=3");
+        },
+        {
+            print("a!=3");
+        });
+    };
     print(cmd("whoami"));
 };
