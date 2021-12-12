@@ -141,6 +141,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AALang.cpp" />
+    <ClCompile Include="CallStack.cpp" />
+    <ClCompile Include="Function.cpp" />
+    <ClCompile Include="Token.cpp" />
+    <ClCompile Include="Variable.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CallStack.h" />
+    <ClInclude Include="Function.h" />
+    <ClInclude Include="Token.h" />
+    <ClInclude Include="Variable.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

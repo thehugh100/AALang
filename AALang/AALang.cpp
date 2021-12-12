@@ -11,173 +11,12 @@
 #include <stdexcept>
 #include <array>
 #include <sstream>
+#include <math.h>
 
-struct Variable
-{
-	enum class VariableType {
-		P_NULL = 0,
-		P_String,
-		P_Float,
-		P_Block,
-	};
-
-	Variable()
-	{
-		type = VariableType::P_NULL;
-		sValue = "";
-		fValue = 0;
-	}
-	Variable(std::string value, bool block = false)
-	{
-		type = VariableType::P_String;
-		sValue = value;
-		fValue = 0;
-
-		if (block)
-		{
-			type = VariableType::P_Block;
-		}
-	}
-	Variable(float value)
-	{
-		type = VariableType::P_Float;
-		sValue = "";
-		fValue = value;
-	}
-
-	std::string toString()
-	{
-		if (type == VariableType::P_NULL)
-			return "NULL";
-
-		if (type == VariableType::P_String)
-			return sValue;
-
-		if (type == VariableType::P_Float)
-			return std::to_string(fValue);
-
-		if (type == VariableType::P_Block)
-			return "{ BLOCK }";
-
-		return "";
-	}
-
-	VariableType type;
-	std::string sValue;
-	float fValue;
-};
-
-struct Token
-{
-	enum class TokenType {
-		T_WhiteSpace = 0,
-		T_Identifier,
-		T_Number,
-		T_AssignmentOperator,
-		T_OpenParenthesis,
-		T_CloseParenthesis,
-		T_Comma,
-		T_String,
-		T_Block,
-		T_EndOfLine,
-	};
-
-	Token(std::string value, TokenType type)
-		:value(value), type(type)
-	{
-
-	}
-
-	std::string typeToString()
-	{
-		if (type == TokenType::T_AssignmentOperator)
-			return "T_AssignmentOperator";
-		if (type == TokenType::T_Identifier)
-			return "T_Identifier";
-		if (type == TokenType::T_Number)
-			return "T_Number";
-		if (type == TokenType::T_OpenParenthesis)
-			return "T_OpenParenthesis";
-		if (type == TokenType::T_CloseParenthesis)
-			return "T_CloseParenthesis";
-		if (type == TokenType::T_Comma)
-			return "T_Comma";
-		if (type == TokenType::T_String)
-			return "T_String";
-		if (type == TokenType::T_Block)
-			return "T_Block";
-		if (type == TokenType::T_WhiteSpace)
-			return "T_WhiteSpace";
-		if (type == TokenType::T_EndOfLine)
-			return "T_EndOfLine";
-
-		return "";
-	}
-
-	std::string value;
-	TokenType type;
-};
-
-typedef std::vector<Token> TokenList;
-
-struct CallStack
-{
-	void push(Variable* v)
-	{
-		cs.push(v);
-	}
-
-	Variable* top()
-	{
-		return cs.top();
-	}
-
-	size_t size()
-	{
-		return cs.size();
-	}
-
-	bool empty()
-	{
-		return cs.empty();
-	}
-
-	void pop()
-	{
-		//delete cs.top();
-		cs.pop();
-	}
-
-	std::stack<Variable*> cs;
-};
-
-typedef std::function<Variable*(CallStack*)> Action;
-
-struct Function
-{
-	Function(std::string identifier, int parameterCount, Action action)
-		:identifier(identifier), parameterCount(parameterCount), action(action)
-	{
-	}
-
-	Variable* execute(CallStack *p)
-	{
-		if (p->size() >= parameterCount)
-		{
-			return action(p);
-		}
-		else
-		{
-			std::cout << "Runtime Error: Call to " << identifier << "() failed. Too few stack items for call. returning nullptr from Function::execute()." << std::endl;
-		}
-
-		return nullptr;
-	}
-
-	std::string identifier;
-	int parameterCount;
-	Action action;
-};
+#include "Variable.h"
+#include "Token.h"
+#include "CallStack.h"
+#include "Function.h"
 
 typedef std::vector<std::string> Program;
 
@@ -374,6 +213,13 @@ struct AALang
 			}
 		));
 		registerFunction(
+			new Function("abs", 1, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				return new Variable((std::abs(v1)));
+				}
+		));
+		registerFunction(
 			new Function("and", 2, [](CallStack* p) {
 				float v1 = p->top()->fValue;
 				p->pop();
@@ -417,6 +263,35 @@ struct AALang
 				}
 
 				return new Variable(result);
+			}
+		));
+		registerFunction(
+			new Function("getFileContents", 1, [this](CallStack* p) {
+				std::string path = p->top()->sValue;
+
+				std::ifstream file(path.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
+				if (!file)
+				{
+					std::cout << "getFileContents(" << path << ") Error: Unable to open file" << std::endl;
+					return new Variable();
+				}
+
+				char* data = nullptr;
+				size_t size = 0;
+
+				size = file.tellg();
+				file.seekg(0, file.beg);
+				data = new char[size];
+				file.read(data, size);
+				file.close();
+
+				return new Variable(std::string(data, size));
+			}
+		));
+		registerFunction(
+			new Function("exit", 0, [this](CallStack* p) {
+				exit(0);
+				return new Variable();
 			}
 		));
 		registerFunction(
@@ -929,5 +804,22 @@ int main()
 		}
 		lineNum++;
 	}
+	std::string cmd;
+	while (true)
+	{
+		std::cout << ">> ";
+		std::getline(std::cin, cmd);
+		if (cmd == "quit" || cmd == "exit")
+			break; 
 
+		Variable* result = aaLang->executeLine(cmd);
+		if (result != nullptr)
+		{
+			std::cout << ">> " << result->toString() << std::endl;
+		}
+		else
+		{
+			std::cout << "Error: nullptr returned on line " << lineNum << std::endl;
+		}
+	}
 }
