@@ -1,14 +1,3 @@
+include("stdlib.aal");
 
-{
-    {
-        a = 2;
-        ifelse(equals(a, 3),
-        {
-            print("a=3");
-        },
-        {
-            print("a!=3");
-        });
-    };
-    print(cmd("whoami"));
-};
+vaPrint(3, "test", "test1", "test2");

@@ -10,7 +10,7 @@
 #include <memory>
 #include <stdexcept>
 #include <array>
-
+#include <sstream>
 
 struct Variable
 {
@@ -144,7 +144,7 @@ struct CallStack
 
 	void pop()
 	{
-		delete cs.top();
+		//delete cs.top();
 		cs.pop();
 	}
 
@@ -168,7 +168,7 @@ struct Function
 		}
 		else
 		{
-			std::cout << "Runtime Error: Call to " << identifier << "() failed. Too few stack items for call." << std::endl;
+			std::cout << "Runtime Error: Call to " << identifier << "() failed. Too few stack items for call. returning nullptr from Function::execute()." << std::endl;
 		}
 
 		return nullptr;
@@ -180,7 +180,8 @@ struct Function
 };
 
 typedef std::vector<std::string> Program;
-void parseDocument(std::filesystem::path filepath, Program* p);
+
+void loadProgram(std::filesystem::path filepath, Program* p);
 void preParse(const char* data, size_t size, Program* p);
 
 bool isIdentifierChar(char v)
@@ -201,6 +202,33 @@ struct AALang
 
 	void registerSTDLib()
 	{
+		registerFunction(
+			new Function("while", 2, [this](CallStack* p) {
+				Variable* eval = p->top();
+				p->pop();
+
+				if (eval->type != Variable::VariableType::P_Block)
+				{
+					std::cout << "Runtime Error: 1st parameter of while() must be a block!" << std::endl;
+					return new Variable();
+				}
+
+				Variable* block = p->top();
+				p->pop();
+
+				if (eval->type != Variable::VariableType::P_Block)
+				{
+					std::cout << "Runtime Error: 2nd parameter of while() must be a block!" << std::endl;
+					return new Variable();
+				}
+
+				while ((int)(executeBlock(eval->sValue)->fValue) != 0)
+				{
+					executeBlock(block->sValue);
+				}
+				return new Variable();
+			}
+		));
 		registerFunction(
 			new Function("if", 2, [this](CallStack* p) {
 				int eval = p->top()->fValue;
@@ -265,6 +293,42 @@ struct AALang
 				}
 		));
 		registerFunction(
+			new Function("lt", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 < v2);
+			}
+		));
+		registerFunction(
+			new Function("gt", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 > v2);
+				}
+		));
+		registerFunction(
+			new Function("lte", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 <= v2);
+				}
+		));
+		registerFunction(
+			new Function("gte", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(v1 >= v2);
+				}
+		));
+		registerFunction(
 			new Function("add", 2, [](CallStack* p) {
 				float v1 = p->top()->fValue;
 				p->pop();
@@ -310,6 +374,34 @@ struct AALang
 			}
 		));
 		registerFunction(
+			new Function("and", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(((int)v1 && (int)v2));
+			}
+		));
+		registerFunction(
+			new Function("or", 2, [](CallStack* p) {
+				float v1 = p->top()->fValue;
+				p->pop();
+				float v2 = p->top()->fValue;
+				p->pop();
+				return new Variable(((int)v1 || (int)v2));
+			}
+		));
+		registerFunction(
+			new Function("pop", 0, [](CallStack* p) {
+				Variable* temp = new Variable();
+				temp->sValue = p->top()->sValue;
+				temp->fValue = p->top()->fValue;
+				temp->type = p->top()->type;
+				p->pop();
+				return temp;
+			}
+		));
+		registerFunction(
 			new Function("cmd", 1, [](CallStack* p) {
 				std::string cmd = p->top()->sValue;
 				p->pop();
@@ -327,6 +419,20 @@ struct AALang
 				return new Variable(result);
 			}
 		));
+		registerFunction(
+			new Function("include", 1, [this](CallStack* p) {
+				std::string path = p->top()->sValue;
+				p->pop();
+
+				Program program;
+				loadProgram(path, &program);
+				for (auto& i : program)
+				{
+					Variable* result = executeLine(i);
+				}
+				return new Variable();
+			}
+		));
 	}
 
 	Variable* call(std::string identifier)
@@ -342,6 +448,17 @@ struct AALang
 				std::cout << "Runtime Error: Callstack is empty" << std::endl;
 			}
 		}
+		else if(variables.find(identifier) != variables.end())
+		{
+			return executeBlock(variables.at(identifier)->sValue);
+		}
+		else
+		{
+			//return null
+			return new Variable();
+		}
+
+		std::cout << "Error: Call(" << identifier << ") returning nullptr" << std::endl;
 		return nullptr;
 	}
 
@@ -468,17 +585,29 @@ struct AALang
 		{
 			std::cout << "Parse Error: Quote mismatch." << std::endl;
 		}
+		if (blockCount != 0)
+		{
+			std::cout << "Parse Error: Block mismatch" << std::endl;
+		}
 	}
 
-	void executeBlock(std::string block)
+	Variable* executeBlock(std::string block)
 	{
+		Variable* ret = nullptr;
 		Program t;
 		preParse(block.c_str(), block.size(), &t);
 
 		for (auto& i : t)
 		{
-			executeLine(i);
+			ret = executeLine(i);
 		}
+
+		if (ret == nullptr)
+		{
+			std::cout << "Error: executeBlock(" << block << ") returning nullptr." << std::endl;
+		}
+
+		return ret;
 	}
 
 	Variable* processImmediate(Token in, bool createIfNotExists = false)
@@ -516,7 +645,7 @@ struct AALang
 		{
 			if (createIfNotExists)
 			{
-				executeBlock(in.value);
+				immediate = executeBlock(in.value);
 			}
 			else
 			{
@@ -526,6 +655,11 @@ struct AALang
 		else
 		{
 			std::cout << "Parse Error: Unexpected Token '" << in.value << " " << in.typeToString() << "'" << std::endl;
+		}
+
+		if (immediate == nullptr)
+		{
+			std::cout << "Error: processImmediate(" << in.value << " [" << in.typeToString() << "]) returning nullptr." << std::endl;
 		}
 
 		return immediate;
@@ -590,9 +724,11 @@ struct AALang
 								subList.push_back(list->at(i));
 							}
 						}
-
-						stack.push(evaluateExpression(&subList));
-						subList.clear();
+						if (!subList.empty())
+						{
+							stack.push(evaluateExpression(&subList));
+							subList.clear();
+						}
 
 						if (parenthesisCount == 0)
 						{
@@ -615,7 +751,16 @@ struct AALang
 		return nullptr;
 	}
 
-	void executeTokens(TokenList* list)
+	std::string TokenListToString(TokenList* list)
+	{
+		std::ostringstream buf;
+		for (auto& i : *list)
+			buf << i.value << "[" << i.typeToString() << "]" << std::endl;
+
+		return buf.str();
+	}
+
+	Variable* executeTokens(TokenList* list)
 	{
 		TokenList lParam;
 		TokenList rParam;
@@ -648,6 +793,7 @@ struct AALang
 			lParamV->type = rParamV->type;
 			lParamV->fValue = rParamV->fValue;
 			lParamV->sValue = rParamV->sValue;
+
 		}
 		else
 		{
@@ -657,22 +803,30 @@ struct AALang
 					executeBlock(lParamV->sValue);
 			}
 		}
+
+		if (lParamV == nullptr)
+		{
+			std::cout << "Error: executeTokens(" << std::endl << TokenListToString(list) << ") returning nullptr." << std::endl;
+		}
+		return lParamV;
 	}
 
-	std::string executeLine(std::string line)
+	Variable* executeLine(std::string line)
 	{
 		TokenList tokens;
 		tokenizeLine(line, &tokens);
 
-		executeTokens(&tokens);
+		Variable* ret = executeTokens(&tokens);
+		
+		if (ret == nullptr)
+			std::cout << "Error: executeLine(" << line << ") returning nullptr." << std::endl;
 
 		//std::cout << std::endl;
 		/*for (auto& i : tokens)
 		{
 			std::cout << "" << i.value << "" << "\t(" << i.typeToString() <<  ")" << std::endl;
 		}*/
-
-		return "";
+		return ret;
 	}
 
 	CallStack callStack;
@@ -715,10 +869,13 @@ void preParse(const char *data, size_t size, Program* p)
 			p->push_back("");
 	}
 	p->pop_back();
-
+	if (blockCount != 0)
+	{
+		std::cout << "PreParse Error: Block mismatch" << std::endl;
+	}
 }
 
-void parseDocument(std::filesystem::path filepath, Program *p)
+void loadProgram(std::filesystem::path filepath, Program *p)
 {
 	if (!std::filesystem::exists(filepath))
 	{
@@ -756,12 +913,21 @@ int main()
 	AALang* aaLang = new AALang();
 
 	Program program;
-	parseDocument("test.aal", &program);
+	loadProgram("test.aal", &program);
 
 	int lineNum = 1;
 	for (auto& i : program)
 	{
-		aaLang->executeLine(i);
+		Variable* result = aaLang->executeLine(i);
+		if (result != nullptr)
+		{
+			std::cout << ">> " <<  result->toString() << std::endl;
+		}
+		else
+		{
+			std::cout << "Error: nullptr returned on line " << lineNum << std::endl;
+		}
+		lineNum++;
 	}
 
 }

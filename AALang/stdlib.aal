@@ -1,0 +1,8 @@
+vaPrint = {
+    amount = pop();
+    current = 0;
+    while({lt(current, amount);}, {
+        print(pop());
+        current = add(current, 1);
+    });
+};
