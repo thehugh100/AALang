@@ -390,20 +390,26 @@ struct AALang
 			if (!inQuote)
 			{
 				if (v == '{')
+				{
 					blockCount++;
+					if(blockCount == 1)
+						continue;
+				}
 				else if (v == '}')
 				{
 					blockCount--;
-					list->push_back(Token(currentValue, Token::TokenType::T_Block));
-					currentValue = "";
-				}
-				else
-				{
-					if (blockCount == 1)
+					if (blockCount == 0)
 					{
-						currentValue += v;
+						list->push_back(Token(currentValue, Token::TokenType::T_Block));
+						currentValue = "";
 						continue;
 					}
+				}
+				
+				if (blockCount > 0)
+				{
+					currentValue += v;
+					continue;
 				}
 			}
 			if (isNumericChar(v) && !foundIdentifier && !inQuote)
