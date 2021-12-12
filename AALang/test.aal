@@ -1,7 +1,5 @@
-print("Test Suite");
-print(add(1, 2));
-print(sub(10, 2));
-print(mul(20, 5));
-print(div(355, 113));
-print(mod(12, 5));
-print(cmd("dir"));
+a = { print("this is in a block") };
+b = a;
+b;
+if(1, b);
+if(0, { print("this will never print"); });

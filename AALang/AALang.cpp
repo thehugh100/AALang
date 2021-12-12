@@ -11,12 +11,14 @@
 #include <stdexcept>
 #include <array>
 
+
 struct Variable
 {
 	enum class VariableType {
 		P_NULL = 0,
 		P_String,
 		P_Float,
+		P_Block,
 	};
 
 	Variable()
@@ -25,11 +27,16 @@ struct Variable
 		sValue = "";
 		fValue = 0;
 	}
-	Variable(std::string value)
+	Variable(std::string value, bool block = false)
 	{
 		type = VariableType::P_String;
 		sValue = value;
 		fValue = 0;
+
+		if (block)
+		{
+			type = VariableType::P_Block;
+		}
 	}
 	Variable(float value)
 	{
@@ -48,6 +55,9 @@ struct Variable
 
 		if (type == VariableType::P_Float)
 			return std::to_string(fValue);
+
+		if (type == VariableType::P_Block)
+			return "{ BLOCK }";
 
 		return "";
 	}
@@ -68,6 +78,7 @@ struct Token
 		T_CloseParenthesis,
 		T_Comma,
 		T_String,
+		T_Block,
 		T_EndOfLine,
 	};
 
@@ -93,6 +104,8 @@ struct Token
 			return "T_Comma";
 		if (type == TokenType::T_String)
 			return "T_String";
+		if (type == TokenType::T_Block)
+			return "T_Block";
 		if (type == TokenType::T_WhiteSpace)
 			return "T_WhiteSpace";
 		if (type == TokenType::T_EndOfLine)
@@ -167,6 +180,8 @@ struct Function
 };
 
 typedef std::vector<std::string> Program;
+void parseDocument(std::filesystem::path filepath, Program* p);
+void preParse(const char* data, size_t size, Program* p);
 
 bool isIdentifierChar(char v)
 {
@@ -186,6 +201,22 @@ struct AALang
 
 	void registerSTDLib()
 	{
+		registerFunction(
+			new Function("if", 2, [this](CallStack* p) {
+				int eval = p->top()->fValue;
+				p->pop();
+
+				Variable* block = p->top();
+				
+				if (eval)
+				{
+					executeBlock(block->sValue);
+				}
+
+				p->pop();
+				return new Variable();
+			}
+		));
 		registerFunction(
 			new Function("print", 1, [](CallStack* p) {
 				std::cout << p->top()->toString() << std::endl;
@@ -239,7 +270,7 @@ struct AALang
 				float v1 = p->top()->fValue;
 				p->pop();
 				float v2 = p->top()->fValue;
-				p->pop();
+				p ->pop();
 				return new Variable(v1 / v2);
 			}
 		));
@@ -320,16 +351,35 @@ struct AALang
 		bool foundNumber = 0;
 		bool foundString = 0;
 		bool inQuote = 0;
+		int blockCount = 0;
 
 		for (int i = 0; i < line.size(); ++i)
 		{
 			char v = line[i];
-			if (v == '"')
+			if (v == '"' && blockCount == 0)
 			{
 				inQuote = !inQuote;
 				continue;
 			}
-
+			if (!inQuote)
+			{
+				if (v == '{')
+					blockCount++;
+				else if (v == '}')
+				{
+					blockCount--;
+					list->push_back(Token(currentValue, Token::TokenType::T_Block));
+					currentValue = "";
+				}
+				else
+				{
+					if (blockCount == 1)
+					{
+						currentValue += v;
+						continue;
+					}
+				}
+			}
 			if (isNumericChar(v) && !foundIdentifier && !inQuote)
 			{
 				currentValue += v;
@@ -347,8 +397,8 @@ struct AALang
 				foundString = true;
 				foundIdentifier = false;
 				foundNumber = false;
+				continue;
 			}
-
 			if (v == '=' || v == ';' || v == '(' || v == ')' || v == ',')
 			{
 				if (foundIdentifier)
@@ -382,6 +432,22 @@ struct AALang
 					list->push_back(Token(",", Token::TokenType::T_Comma));
 			}
 		}
+		if (inQuote)
+		{
+			std::cout << "Parse Error: Quote mismatch." << std::endl;
+		}
+	}
+
+	void executeBlock(std::string block)
+	{
+		Program t;
+		preParse(block.c_str(), block.size(), &t);
+
+		for (auto& i : t)
+		{
+			std::cout << i << std::endl;
+			std::cout << executeLine(i) << std::endl;
+		}
 	}
 
 	Variable* processImmediate(Token in, bool createIfNotExists = false)
@@ -397,7 +463,7 @@ struct AALang
 			{
 				if (createIfNotExists)
 				{
-					immediate = assignVariable(in.value, new Variable(0));
+					immediate = assignVariable(in.value, new Variable());
 				}
 				else
 				{
@@ -414,6 +480,17 @@ struct AALang
 		else if (in.type == Token::TokenType::T_String)
 		{
 			immediate = new Variable(in.value);
+		}
+		else if (in.type == Token::TokenType::T_Block)
+		{
+			if (createIfNotExists)
+			{
+				executeBlock(in.value);
+			}
+			else
+			{
+				immediate = new Variable(in.value, true);
+			}
 		}
 		else
 		{
@@ -543,8 +620,11 @@ struct AALang
 		}
 		else
 		{
-			if(lParamV)
-				std::cout << ">> " << lParamV->toString() << std::endl;
+			if (lParamV)
+			{
+				if (lParamV->type == Variable::VariableType::P_Block)
+					executeBlock(lParamV->sValue);
+			}
 		}
 	}
 
@@ -568,6 +648,19 @@ struct AALang
 	std::map<std::string, Function*> functions;
 	std::map<std::string, Variable*> variables;
 };
+
+void preParse(const char *data, size_t size, Program* p)
+{
+	p->push_back("");
+	for (int i = 0; i < size; ++i)
+	{
+		if(data[i] != '\n' && data[i] != '\r')
+			p->back() += data[i];
+
+		if (data[i] == '\n')
+			p->push_back("");
+	}
+}
 
 void parseDocument(std::filesystem::path filepath, Program *p)
 {
@@ -599,16 +692,7 @@ void parseDocument(std::filesystem::path filepath, Program *p)
 	file.read(data, size);
 	file.close();
 
-	p->push_back("");
-	for (int i = 0; i < size; ++i)
-	{
-		if(data[i] != '\n' && data[i] != '\r')
-			p->back() += data[i];
-
-		if (data[i] == ';')
-			p->push_back("");
-	}
-	p->pop_back();
+	preParse(data, size, p);
 }
 
 int main()
