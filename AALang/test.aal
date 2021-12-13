@@ -1,3 +1,18 @@
 include("stdlib.aal");
 
-print(getFileContents("stdlib.aal"));
+a;
+i = 0;
+while({lt(i, 10);}, {
+    setMap(a, i, "Value");
+    i = add(i, 1);
+});
+
+println("Test of new lines.");
+
+k;
+v;
+foreach(a, k, v, {
+    vaPrint(4, k, " = ", v, endl());
+});
+
+print(vaConcat(4, "this ", "is ", "concat", "\n"));

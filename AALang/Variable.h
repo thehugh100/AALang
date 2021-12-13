@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
+#include <map>
+
+class Variable;
 
 class Variable
 {
@@ -10,6 +13,7 @@ public:
 		P_String,
 		P_Float,
 		P_Block,
+		P_Map,
 	};
 
 	Variable();
@@ -20,5 +24,6 @@ public:
 
 	VariableType type;
 	std::string sValue;
+	std::map<std::string, Variable*> mValue;
 	float fValue;
 };

@@ -1,8 +1,25 @@
-vaPrint = {
+vaConcat = {
     amount = pop();
-    current = 0;
+    ret = pop();
+    current = 1;
     while({lt(current, amount);}, {
-        print(pop());
+        ret = add(ret, pop());
         current = add(current, 1);
     });
+
+    ret;
+};
+
+vaPrint = {
+    print(vaConcat(pop()));
+};
+
+
+endl = {
+    "\r\n";
+};
+
+println = {
+    print(pop());
+    print(endl());
 };

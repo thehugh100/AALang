@@ -18,6 +18,8 @@
 #include "CallStack.h"
 #include "Function.h"
 
+#include <regex>
+
 typedef std::vector<std::string> Program;
 
 void loadProgram(std::filesystem::path filepath, Program* p);
@@ -36,6 +38,8 @@ struct AALang
 {
 	AALang()
 	{
+		isInForeach = false;
+		value = nullptr;
 		registerSTDLib();
 	}
 
@@ -66,6 +70,86 @@ struct AALang
 					executeBlock(block->sValue);
 				}
 				return new Variable();
+			}
+		));
+
+		registerFunction(
+			new Function("foreach", 4, [this](CallStack* p) {
+			Variable* v = p->top();
+			p->pop();
+
+			if (v->type != Variable::VariableType::P_Map)
+			{
+				std::cout << "Runtime Error: 1st parameter of foreach() must be a Map!" << std::endl;
+				return new Variable();
+			}
+
+			Variable* key = p->top();
+			p->pop();
+			Variable* val = p->top();
+			p->pop();
+
+			Variable* block = p->top();
+			p->pop();
+
+
+			if (block->type != Variable::VariableType::P_Block)
+			{
+				std::cout << "Runtime Error: 2nd parameter of foreach() must be a block!" << std::endl;
+				return new Variable();
+			}
+
+			isInForeach = true;
+			for(auto &i : v->mValue)
+			{
+				key->sValue = i.first;
+				key->type = Variable::VariableType::P_String;
+
+				val->sValue = i.second->sValue;
+				val->fValue = i.second->fValue;
+				val->mValue = i.second->mValue;
+				val->type = i.second->type;
+
+				executeBlock(block->sValue);
+			}
+			isInForeach = false;
+
+			return new Variable();
+		}
+		));
+		registerFunction(
+			new Function("value", 0, [this](CallStack* p) {
+				if (!isInForeach)
+				{
+					std::cout << "Runtime Error: value() cannot be called outside of foreach()" << std::endl;
+					return new Variable();
+				}
+				return value;
+			}
+		));
+		registerFunction(
+			new Function("setMap", 3, [](CallStack* p) {
+				Variable* lVal = p->top();
+				p->pop();
+				std::string key = p->top()->toString();
+				p->pop();
+				Variable* rVal = p->top();
+				p->pop();
+
+				lVal->type = Variable::VariableType::P_Map;
+				lVal->mValue[key] = rVal;
+
+				return lVal;
+			}
+		));
+		registerFunction(
+			new Function("getMap", 2, [](CallStack* p) {
+				Variable* lVal = p->top();
+				p->pop();
+				std::string key = p->top()->toString();
+				p->pop();
+
+				return lVal->mValue[key];
 			}
 		));
 		registerFunction(
@@ -103,25 +187,25 @@ struct AALang
 		));
 		registerFunction(
 			new Function("print", 1, [](CallStack* p) {
-				std::cout << p->top()->toString() << std::endl;
+				std::cout << p->top()->toString();
 				p->pop();
 				return new Variable();
 			}
 		));
-		registerFunction(
-			new Function("printv", 3, [](CallStack* p) {
+		//registerFunction(
+		//	new Function("printv", 3, [](CallStack* p) {
 
-				int params = p->top()->fValue;
-				p->pop();
+		//		int params = p->top()->fValue;
+		//		p->pop();
 
-				for (int i = 0; i < params; ++i)
-				{
-					std::cout << p->top()->toString() << std::endl;
-					p->pop();
-				}
-				return new Variable();
-			}
-		));
+		//		for (int i = 0; i < params; ++i)
+		//		{
+		//			std::cout << p->top()->toString() << std::endl;
+		//			p->pop();
+		//		}
+		//		return new Variable();
+		//	}
+		//));
 		registerFunction(
 			new Function("equals", 2, [](CallStack* p) {
 				float v1 = p->top()->fValue;
@@ -169,10 +253,19 @@ struct AALang
 		));
 		registerFunction(
 			new Function("add", 2, [](CallStack* p) {
+				bool isStringV1 = p->top()->type == Variable::VariableType::P_String;
+				std::string v1s = p->top()->sValue;
 				float v1 = p->top()->fValue;
 				p->pop();
+
+				bool isStringV2 = p->top()->type == Variable::VariableType::P_String;
+				std::string v2s = p->top()->sValue;
 				float v2 = p->top()->fValue;
 				p->pop();
+
+				if (isStringV1 && isStringV2)
+					return new Variable(v1s + v2s);
+
 				return new Variable(v1 + v2);
 			}
 		));
@@ -349,8 +442,6 @@ struct AALang
 	{
 		if (variables.find(identifier) != variables.end())
 		{
-			std::cout << identifier << " = " << newVar->toString() << std::endl;
-
 			delete variables[identifier];
 			variables[identifier] = newVar;
 		}
@@ -435,6 +526,12 @@ struct AALang
 				}
 				if (foundString)
 				{
+					if (currentValue.find('\\') != -1)
+					{
+						currentValue = std::regex_replace(currentValue, std::regex("\\\\n"), "\n");
+						currentValue = std::regex_replace(currentValue, std::regex("\\\\r"), "\r");
+						currentValue = std::regex_replace(currentValue, std::regex("\\\\t"), "\t");
+					}
 					list->push_back(Token(currentValue, Token::TokenType::T_String));
 				}
 
@@ -703,6 +800,9 @@ struct AALang
 		}*/
 		return ret;
 	}
+
+	bool isInForeach;
+	Variable* value;
 
 	CallStack callStack;
 	std::map<std::string, Function*> functions;
