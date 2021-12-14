@@ -2,7 +2,7 @@
 
 #include <string>
 #include <map>
-
+#include <memory>
 class Variable;
 
 class Variable
@@ -23,9 +23,11 @@ public:
 	~Variable();
 
 	std::string toString();
+	std::string typeToString();
 
 	VariableType type;
 	std::string sValue;
-	std::map<std::string, Variable*> mValue;
+	std::map<std::string, std::shared_ptr<Variable>> mValue;
 	float fValue;
+	bool registered;
 };

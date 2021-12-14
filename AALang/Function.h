@@ -6,13 +6,13 @@
 class Variable;
 class CallStack;
 
-typedef std::function<Variable* (CallStack*)> Action;
+typedef std::function<std::shared_ptr<Variable> (CallStack*)> Action;
 
 class Function
 {
 public:
 	Function(std::string identifier, int parameterCount, Action action);
-	Variable* execute(CallStack* p);
+	std::shared_ptr<Variable> execute(CallStack* p);
 
 	std::string identifier;
 	int parameterCount;

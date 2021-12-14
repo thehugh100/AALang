@@ -6,6 +6,7 @@ Variable::Variable()
 	type = VariableType::P_NULL;
 	sValue = "";
 	fValue = 0;
+	registered = false;
 }
 Variable::Variable(std::string value, bool block)
 {
@@ -17,17 +18,19 @@ Variable::Variable(std::string value, bool block)
 	{
 		type = VariableType::P_Block;
 	}
+	registered = false;
 }
 Variable::Variable(float value)
 {
 	type = VariableType::P_Float;
 	sValue = "";
 	fValue = value;
+	registered = false;
 }
 
 Variable::~Variable()
 {
-	//std::cout << "Deconstructing " << std::endl;
+	//std::cout << "Deconstructing " << typeToString() << std::endl;
 }
 
 std::string Variable::toString()
@@ -45,4 +48,24 @@ std::string Variable::toString()
 		return "{ BLOCK }";
 
 	return "";
+}
+
+std::string Variable::typeToString()
+{
+	if (type == VariableType::P_NULL)
+		return "P_NULL";
+
+	if (type == VariableType::P_String)
+		return "P_String";
+
+	if (type == VariableType::P_Float)
+		return "P_Float";
+
+	if (type == VariableType::P_Block)
+		return "P_Block";
+
+	if (type == VariableType::P_Map)
+		return "P_Map";
+
+	return std::string();
 }

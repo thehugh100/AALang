@@ -7,7 +7,7 @@ Function::Function(std::string identifier, int parameterCount, Action action)
 {
 }
 
-Variable* Function::execute(CallStack* p)
+std::shared_ptr<Variable> Function::execute(CallStack* p)
 {
 	if (p->size() >= parameterCount)
 	{

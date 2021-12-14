@@ -1,26 +1,29 @@
 include("stdlib.aal");
-// q = {
-//     a;
-//     i = 0;
-//     while({lt(i, 10);}, {
-//         a[i] = "Value";
-//         i = add(i, 1);
-//     });
+q = {
+    a;
+    i = 0;
+    while({lt(i, 10);}, {
+        a[i] = "Value";
+        i = add(i, 1);
+    });
 
-//     k;
-//     v;
-//     foreach(a, k, v, {
-//         vaPrint(4, k, " = ", v, endl());
-//     });
+    counter = 0;
+    k;
+    v;
+    foreach(a, k, v, {
+        vaPrint(4, k, " = ", v, endl());
+        counter = add(counter, 1);
+    });
 
-//     a["test_key"] = 13;
+    a["test_key"] = 13;
 
-//     a["test_key_2"] = "ayylmao";
+    a["test_key_2"] = "ayylmao";
 
-//     println(a["test_key"]);
-//     println(a[vaConcat(5, "test", "_", "key", "_", "2")]);
-// };
+    println(a["test_key"]);
+    println(a[vaConcat(5, "test", "_", "key", "_", "2")]);
+};
 
-// j = 0;
-// while({lt(j, 500);}, {q(); println(j); j = add(j, 1);});
-println("it didn't die");
+j = 0;
+while({lt(j, 1000000);}, {q(); j = add(j, 1);});
+
+println(timeMS());

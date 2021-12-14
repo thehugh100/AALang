@@ -20,6 +20,8 @@
 
 #include <regex>
 
+#include <chrono>
+
 typedef std::vector<std::string> Program;
 
 void loadProgram(std::filesystem::path filepath, Program* p);
@@ -38,65 +40,73 @@ struct AALang
 {
 	AALang()
 	{
+		null = std::make_shared<Variable>(); //default null
 		isInForeach = false;
 		value = nullptr;
 		registerSTDLib();
+		startTime = std::chrono::high_resolution_clock::now();
 	}
 
 	void registerSTDLib()
 	{
 		registerFunction(
+			new Function("timeMS", 0, [this](CallStack* p) {
+				return std::make_shared<Variable>((std::chrono::duration<float, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count()));
+			}
+		));
+
+		registerFunction(
 			new Function("while", 2, [this](CallStack* p) {
-				Variable* eval = p->top();
+				std::shared_ptr<Variable> eval = p->top();
 				p->pop();
 
 				if (eval->type != Variable::VariableType::P_Block)
 				{
 					std::cout << "Runtime Error: 1st parameter of while() must be a block!" << std::endl;
-					return new Variable();
+					return null;
 				}
 
-				Variable* block = p->top();
+				std::shared_ptr<Variable> block = p->top();
 				p->pop();
 
 				if (eval->type != Variable::VariableType::P_Block)
 				{
 					std::cout << "Runtime Error: 2nd parameter of while() must be a block!" << std::endl;
-					return new Variable();
+					return null;
 				}
 
 				while ((int)(executeBlock(eval->sValue)->fValue) != 0)
 				{
 					executeBlock(block->sValue);
 				}
-				return new Variable();
+				return null;
 			}
 		));
 
 		registerFunction(
 			new Function("foreach", 4, [this](CallStack* p) {
-			Variable* v = p->top();
+			std::shared_ptr<Variable> v = p->top();
 			p->pop();
 
 			if (v->type != Variable::VariableType::P_Map)
 			{
 				std::cout << "Runtime Error: 1st parameter of foreach() must be a Map!" << std::endl;
-				return new Variable();
+				return null;
 			}
 
-			Variable* key = p->top();
+			std::shared_ptr<Variable> key = p->top();
 			p->pop();
-			Variable* val = p->top();
+			std::shared_ptr<Variable> val = p->top();
 			p->pop();
 
-			Variable* block = p->top();
+			std::shared_ptr<Variable> block = p->top();
 			p->pop();
 
 
 			if (block->type != Variable::VariableType::P_Block)
 			{
 				std::cout << "Runtime Error: 2nd parameter of foreach() must be a block!" << std::endl;
-				return new Variable();
+				return null;
 			}
 
 			isInForeach = true;
@@ -114,7 +124,7 @@ struct AALang
 			}
 			isInForeach = false;
 
-			return new Variable();
+			return null;
 		}
 		));
 		registerFunction(
@@ -122,18 +132,18 @@ struct AALang
 				if (!isInForeach)
 				{
 					std::cout << "Runtime Error: value() cannot be called outside of foreach()" << std::endl;
-					return new Variable();
+					return null;
 				}
 				return value;
 			}
 		));
 		registerFunction(
 			new Function("setMap", 3, [](CallStack* p) {
-				Variable* lVal = p->top();
+				std::shared_ptr<Variable> lVal = p->top();
 				p->pop();
 				std::string key = p->top()->toString();
 				p->pop();
-				Variable* rVal = p->top();
+				std::shared_ptr<Variable> rVal = p->top();
 				p->pop();
 
 				lVal->type = Variable::VariableType::P_Map;
@@ -144,7 +154,7 @@ struct AALang
 		));
 		registerFunction(
 			new Function("getMap", 2, [](CallStack* p) {
-				Variable* lVal = p->top();
+				std::shared_ptr<Variable> lVal = p->top();
 				p->pop();
 				std::string key = p->top()->toString();
 				p->pop();
@@ -157,7 +167,7 @@ struct AALang
 				int eval = p->top()->fValue;
 				p->pop();
 
-				Variable* block = p->top();
+				std::shared_ptr<Variable> block = p->top();
 				
 				if (eval)
 				{
@@ -165,7 +175,7 @@ struct AALang
 				}
 
 				p->pop();
-				return new Variable();
+				return null;
 			}
 		));
 		registerFunction(
@@ -175,21 +185,21 @@ struct AALang
 				if (!eval)
 					p->pop();
 
-				Variable* block = p->top();
+				std::shared_ptr<Variable> block = p->top();
 				executeBlock(block->sValue);
 
 				if (eval)
 					p->pop();
 
 				p->pop();
-				return new Variable();
+				return null;
 				}
 		));
 		registerFunction(
-			new Function("print", 1, [](CallStack* p) {
+			new Function("print", 1, [this](CallStack* p) {
 				std::cout << p->top()->toString();
 				p->pop();
-				return new Variable();
+				return null;
 			}
 		));
 		//registerFunction(
@@ -203,7 +213,7 @@ struct AALang
 		//			std::cout << p->top()->toString() << std::endl;
 		//			p->pop();
 		//		}
-		//		return new Variable();
+		//		null;
 		//	}
 		//));
 		registerFunction(
@@ -212,7 +222,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(v1 == v2);
+				return std::make_shared<Variable>(v1 == v2);
 				}
 		));
 		registerFunction(
@@ -221,7 +231,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(v1 < v2);
+				return std::make_shared<Variable>(v1 < v2);
 			}
 		));
 		registerFunction(
@@ -230,7 +240,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(v1 > v2);
+				return std::make_shared<Variable>(v1 > v2);
 				}
 		));
 		registerFunction(
@@ -239,7 +249,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(v1 <= v2);
+				return std::make_shared<Variable>(v1 <= v2);
 				}
 		));
 		registerFunction(
@@ -248,7 +258,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(v1 >= v2);
+				return std::make_shared<Variable>(v1 >= v2);
 				}
 		));
 		registerFunction(
@@ -264,9 +274,9 @@ struct AALang
 				p->pop();
 
 				if (isStringV1 && isStringV2)
-					return new Variable(v1s + v2s);
+					return std::make_shared<Variable>(v1s + v2s);
 
-				return new Variable(v1 + v2);
+				return std::make_shared<Variable>(v1 + v2);
 			}
 		));
 		registerFunction(
@@ -275,7 +285,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(v1 - v2);
+				return std::make_shared<Variable>(v1 - v2);
 			}
 		));
 		registerFunction(
@@ -284,7 +294,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(v1 * v2);
+				return std::make_shared<Variable>(v1 * v2);
 			}
 		));
 		registerFunction(
@@ -293,7 +303,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p ->pop();
-				return new Variable(v1 / v2);
+				return std::make_shared<Variable>(v1 / v2);
 			}
 		));
 		registerFunction(
@@ -302,14 +312,14 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(((int)v1 % (int)v2));
+				return std::make_shared<Variable>(((int)v1 % (int)v2));
 			}
 		));
 		registerFunction(
 			new Function("abs", 1, [](CallStack* p) {
 				float v1 = p->top()->fValue;
 				p->pop();
-				return new Variable((std::abs(v1)));
+				return std::make_shared<Variable>((std::abs(v1)));
 				}
 		));
 		registerFunction(
@@ -318,7 +328,7 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(((int)v1 && (int)v2));
+				return std::make_shared<Variable>((int)v1 && (int)v2);
 			}
 		));
 		registerFunction(
@@ -327,12 +337,12 @@ struct AALang
 				p->pop();
 				float v2 = p->top()->fValue;
 				p->pop();
-				return new Variable(((int)v1 || (int)v2));
+				return std::make_shared<Variable>((int)v1 || (int)v2);
 			}
 		));
 		registerFunction(
 			new Function("pop", 0, [](CallStack* p) {
-				Variable* temp = new Variable();
+				std::shared_ptr<Variable> temp = std::make_shared<Variable>();
 				temp->sValue = p->top()->sValue;
 				temp->fValue = p->top()->fValue;
 				temp->type = p->top()->type;
@@ -355,7 +365,7 @@ struct AALang
 					result += buffer.data();
 				}
 
-				return new Variable(result);
+				return std::make_shared<Variable>(result);
 			}
 		));
 		registerFunction(
@@ -366,7 +376,7 @@ struct AALang
 				if (!file)
 				{
 					std::cout << "getFileContents(" << path << ") Error: Unable to open file" << std::endl;
-					return new Variable();
+					return null;
 				}
 
 				char* data = nullptr;
@@ -378,13 +388,13 @@ struct AALang
 				file.read(data, size);
 				file.close();
 
-				return new Variable(std::string(data, size));
+				return std::shared_ptr<Variable>(new Variable(std::string(data, size)));
 			}
 		));
 		registerFunction(
 			new Function("exit", 0, [this](CallStack* p) {
 				exit(0);
-				return new Variable();
+				return null;
 			}
 		));
 		registerFunction(
@@ -396,18 +406,18 @@ struct AALang
 				loadProgram(path, &program);
 				for (auto& i : program)
 				{
-					Variable* result = executeLine(i);
+					std::shared_ptr<Variable> result = executeLine(i);
 				}
-				return new Variable();
+				return null;
 			}
 		));
 	}
 
-	Variable* call(std::string identifier)
+	std::shared_ptr<Variable> call(std::string identifier)
 	{
 		if (functions.find(identifier) != functions.end())
 		{
-			if (!callStack.empty())
+			if (!callStack.empty() || functions.at(identifier)->parameterCount == 0)
 			{
 				return functions.at(identifier)->execute(&callStack);
 			}
@@ -423,7 +433,7 @@ struct AALang
 		else
 		{
 			//return null
-			return new Variable();
+			return null;
 		}
 
 		std::cout << "Error: Call(" << identifier << ") returning nullptr" << std::endl;
@@ -438,11 +448,12 @@ struct AALang
 		return newFunc;
 	}
 
-	Variable* assignVariable(std::string identifier, Variable* newVar)
+	std::shared_ptr<Variable> assignVariable(std::string identifier, std::shared_ptr<Variable> newVar)
 	{
+		newVar->registered = true;
 		if (variables.find(identifier) != variables.end())
 		{
-			delete variables[identifier];
+			//TODO: delete variables[identifier];
 			variables[identifier] = newVar;
 		}
 		else
@@ -576,9 +587,9 @@ struct AALang
 		}
 	}
 
-	Variable* executeBlock(std::string block)
+	std::shared_ptr<Variable> executeBlock(std::string block)
 	{
-		Variable* ret = nullptr;
+		std::shared_ptr<Variable> ret = nullptr;
 		Program t;
 		preParse(block.c_str(), block.size(), &t);
 
@@ -595,9 +606,9 @@ struct AALang
 		return ret;
 	}
 
-	Variable* processImmediate(Token in, bool createIfNotExists = false)
+	std::shared_ptr<Variable> processImmediate(Token in, bool createIfNotExists = false)
 	{
-		Variable* immediate = nullptr;
+		std::shared_ptr<Variable> immediate;
 		if (in.type == Token::TokenType::T_Identifier)
 		{
 			if (variables.find(in.value) != variables.end())
@@ -608,23 +619,23 @@ struct AALang
 			{
 				if (createIfNotExists)
 				{
-					immediate = assignVariable(in.value, new Variable());
+					immediate = assignVariable(in.value, std::make_shared<Variable>());
 				}
 				else
 				{
 					//return NULL
-					immediate = new Variable();
+					immediate = null;
 					std::cout << "Parse Error: Unknown Identifier '" << in.value << "'" << std::endl;
 				}
 			}
 		}
 		else if (in.type == Token::TokenType::T_Number)
 		{
-			immediate = new Variable(std::stof(in.value));
+			immediate = std::shared_ptr<Variable>(new Variable(std::stof(in.value)));
 		}
 		else if (in.type == Token::TokenType::T_String)
 		{
-			immediate = new Variable(in.value);
+			immediate = std::shared_ptr<Variable>(new Variable(in.value));
 		}
 		else if (in.type == Token::TokenType::T_Block)
 		{
@@ -634,7 +645,7 @@ struct AALang
 			}
 			else
 			{
-				immediate = new Variable(in.value, true);
+				immediate = std::shared_ptr<Variable>(new Variable(in.value, true));
 			}
 		}
 		else
@@ -650,12 +661,12 @@ struct AALang
 		return immediate;
 	}
 
-	Variable* evaluateExpression(TokenList* list, bool createIfNotExists = false)
+	std::shared_ptr<Variable> evaluateExpression(TokenList* list, bool createIfNotExists = false)
 	{
 		// return null if expression is empty
 		if (list->empty())
 		{
-			return new Variable();
+			return null;
 		}
 		else
 		{
@@ -683,13 +694,13 @@ struct AALang
 					}
 					if (foundMatchingSquareBracket)
 					{
-						Variable* index = evaluateExpression(&subList);
-						Variable* val = processImmediate(list->at(0), createIfNotExists);
+						std::shared_ptr<Variable> index = evaluateExpression(&subList);
+						std::shared_ptr<Variable> val = processImmediate(list->at(0), createIfNotExists);
 						if (val)
 						{
 							if (createIfNotExists)
 							{
-								val->mValue[index->toString()] = new Variable();
+								val->mValue[index->toString()] = null;
 								val->type = Variable::VariableType::P_Map;
 							}
 						}
@@ -711,7 +722,7 @@ struct AALang
 						std::string identifier = list->at(0).value;
 
 						TokenList subList;
-						std::stack<Variable*> stack;
+						std::stack<std::shared_ptr<Variable>> stack;
 
 						for (int i = 2; i < list->size()-1; ++i)
 						{
@@ -780,7 +791,7 @@ struct AALang
 		return buf.str();
 	}
 
-	Variable* executeTokens(TokenList* list)
+	std::shared_ptr<Variable> executeTokens(TokenList* list)
 	{
 		TokenList lParam;
 		TokenList rParam;
@@ -805,8 +816,8 @@ struct AALang
 			}
 		}
 
-		Variable* lParamV = evaluateExpression(&lParam, true);
-		Variable* rParamV = evaluateExpression(&rParam);
+		std::shared_ptr<Variable> lParamV = evaluateExpression(&lParam, true);
+		std::shared_ptr<Variable> rParamV = evaluateExpression(&rParam);
 
 		if (assignment)
 		{
@@ -828,15 +839,25 @@ struct AALang
 		{
 			std::cout << "Error: executeTokens(" << std::endl << TokenListToString(list) << ") returning nullptr." << std::endl;
 		}
+
 		return lParamV;
 	}
 
-	Variable* executeLine(std::string line)
+	std::shared_ptr<Variable> executeLine(std::string line)
 	{
-		TokenList tokens;
-		tokenizeLine(line, &tokens);
+		TokenList *tokens;
+		if (tokenCache.find(line) == tokenCache.end())
+		{
+			tokens = new TokenList();
+			tokenizeLine(line, tokens);
+			tokenCache[line] = tokens;
+		}
+		else
+		{
+			tokens = tokenCache[line];
+		}
 
-		Variable* ret = executeTokens(&tokens);
+		std::shared_ptr<Variable> ret = executeTokens(tokens);
 		
 		if (ret == nullptr)
 			std::cout << "Error: executeLine(" << line << ") returning nullptr." << std::endl;
@@ -849,12 +870,16 @@ struct AALang
 		return ret;
 	}
 
-	bool isInForeach;
-	Variable* value;
+	std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
 
+	bool isInForeach;
+	std::shared_ptr<Variable> value;
+	std::shared_ptr<Variable> null;
+
+	std::map<std::string, TokenList*> tokenCache;
 	CallStack callStack;
 	std::map<std::string, Function*> functions;
-	std::map<std::string, Variable*> variables;
+	std::map<std::string, std::shared_ptr<Variable>> variables;
 };
 
 void preParse(const char *data, size_t size, Program* p)
@@ -942,7 +967,7 @@ int main()
 	int lineNum = 1;
 	for (auto& i : program)
 	{
-		Variable* result = aaLang->executeLine(i);
+		std::shared_ptr<Variable> result = aaLang->executeLine(i);
 		if (result != nullptr)
 		{
 			std::cout << ">> " <<  result->toString() << std::endl;
@@ -961,7 +986,7 @@ int main()
 		if (cmd == "quit" || cmd == "exit")
 			break; 
 
-		Variable* result = aaLang->executeLine(cmd);
+		std::shared_ptr<Variable> result = aaLang->executeLine(cmd);
 		if (result != nullptr)
 		{
 			std::cout << ">> " << result->toString() << std::endl;

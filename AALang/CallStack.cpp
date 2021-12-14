@@ -1,11 +1,11 @@
 #include "CallStack.h"
 
-void CallStack::push(Variable* v)
+void CallStack::push(std::shared_ptr<Variable> v)
 {
 	cs.push(v);
 }
 
-Variable* CallStack::top()
+std::shared_ptr<Variable> CallStack::top()
 {
 	return cs.top();
 }
