@@ -1,18 +1,26 @@
 include("stdlib.aal");
+// q = {
+//     a;
+//     i = 0;
+//     while({lt(i, 10);}, {
+//         a[i] = "Value";
+//         i = add(i, 1);
+//     });
 
-a;
-i = 0;
-while({lt(i, 10);}, {
-    setMap(a, i, "Value");
-    i = add(i, 1);
-});
+//     k;
+//     v;
+//     foreach(a, k, v, {
+//         vaPrint(4, k, " = ", v, endl());
+//     });
 
-println("Test of new lines.");
+//     a["test_key"] = 13;
 
-k;
-v;
-foreach(a, k, v, {
-    vaPrint(4, k, " = ", v, endl());
-});
+//     a["test_key_2"] = "ayylmao";
 
-print(vaConcat(4, "this ", "is ", "concat", "\n"));
+//     println(a["test_key"]);
+//     println(a[vaConcat(5, "test", "_", "key", "_", "2")]);
+// };
+
+// j = 0;
+// while({lt(j, 500);}, {q(); println(j); j = add(j, 1);});
+println("it didn't die");

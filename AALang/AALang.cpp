@@ -453,6 +453,7 @@ struct AALang
 		return newVar;
 	}
 
+	//TODO: cache this
 	void tokenizeLine(std::string line, TokenList* list)
 	{
 		std::string currentValue;
@@ -514,7 +515,7 @@ struct AALang
 				foundNumber = false;
 				continue;
 			}
-			if (v == '=' || v == ';' || v == '(' || v == ')' || v == ',')
+			if (v == '=' || v == ';' || v == '(' || v == ')' || v == '[' || v == ']' || v == ',' || v == '+' || v == '-' || v == '*' || v == '/')
 			{
 				if (foundIdentifier)
 				{
@@ -543,12 +544,24 @@ struct AALang
 
 				if(v == '=')
 					list->push_back(Token("=", Token::TokenType::T_AssignmentOperator));
+				if (v == '+')
+					list->push_back(Token("+", Token::TokenType::T_ArithmeticOperator));
+				if (v == '-')
+					list->push_back(Token("-", Token::TokenType::T_ArithmeticOperator));
+				if (v == '*')
+					list->push_back(Token("*", Token::TokenType::T_ArithmeticOperator));
+				if (v == '/')
+					list->push_back(Token("/", Token::TokenType::T_ArithmeticOperator));
 				if (v == ';')
 					list->push_back(Token(";", Token::TokenType::T_EndOfLine));
 				if (v == '(')
 					list->push_back(Token("(", Token::TokenType::T_OpenParenthesis));
 				if (v == ')')
 					list->push_back(Token(")", Token::TokenType::T_CloseParenthesis));
+				if (v == '[')
+					list->push_back(Token("[", Token::TokenType::T_OpenSquareBracket));
+				if (v == ']')
+					list->push_back(Token("]", Token::TokenType::T_CloseSquareBracket));
 				if (v == ',')
 					list->push_back(Token(",", Token::TokenType::T_Comma));
 			}
@@ -654,6 +667,41 @@ struct AALang
 			}
 			else
 			{
+				if (list->at(1).type == Token::TokenType::T_OpenSquareBracket) //must be an array index
+				{
+					bool foundMatchingSquareBracket = false;
+					TokenList subList;
+					for (int i = 2; i < list->size(); ++i)
+					{
+						auto currentType = list->at(i).type;
+						if (currentType == Token::TokenType::T_CloseSquareBracket)
+						{
+							foundMatchingSquareBracket = true;
+							break;
+						}
+						subList.push_back(list->at(i));
+					}
+					if (foundMatchingSquareBracket)
+					{
+						Variable* index = evaluateExpression(&subList);
+						Variable* val = processImmediate(list->at(0), createIfNotExists);
+						if (val)
+						{
+							if (createIfNotExists)
+							{
+								val->mValue[index->toString()] = new Variable();
+								val->type = Variable::VariableType::P_Map;
+							}
+						}
+
+						return val->mValue[index->toString()];
+					}
+					else
+					{
+						std::cout << "Parse Error: square bracket mismatch, returning nullptr" << std::endl;
+						return nullptr;
+					}
+				}
 				if (list->size() >= 3)
 				{
 					if (list->at(0).type == Token::TokenType::T_Identifier && list->at(1).type == Token::TokenType::T_OpenParenthesis)
@@ -713,7 +761,7 @@ struct AALang
 						}
 						else
 						{
-							std::cout << "Parse Error: Parenthesis mismatch" << std::endl;
+							std::cout << "Parse Error: Parenthesis mismatch, returning nullptr" << std::endl;
 							return nullptr;
 						}
 					}
@@ -811,35 +859,36 @@ struct AALang
 
 void preParse(const char *data, size_t size, Program* p)
 {
-	/*p->push_back("");
-	for (int i = 0; i < size; ++i)
-	{
-		if(data[i] != '\n' && data[i] != '\r')
-			p->back() += data[i];
-
-		if (data[i] == '\n')
-			p->push_back("");
-	}*/
-
 	int blockCount = 0;
 	int inQuote = 0;
+
 	p->push_back("");
 	for (int i = 0; i < size; ++i)
 	{
 		if (!inQuote)
 		{
+			if (size - i > 1)
+			{
+				if (data[i] == '/' && data[i + 1] == '/')
+				{
+					while (data[++i] != '\n');
+				}
+			}
+
 			if (data[i] == '{')
 				blockCount++;
 			else if (data[i] == '}')
 				blockCount--;
 		}
-		if (blockCount == 0)
-		{
-			if (data[i] == '"')
-				inQuote = !inQuote;
-		}
+
+		if (data[i] == '"')
+			inQuote = !inQuote;
+		
 		if (data[i] != '\n' && data[i] != '\r')
+		{
 			p->back() += data[i];
+		}
+
 		if (data[i] == ';' && !inQuote && blockCount == 0)
 			p->push_back("");
 	}

@@ -20,6 +20,8 @@ public:
 	Variable(std::string value, bool block = false);
 	Variable(float value);
 
+	~Variable();
+
 	std::string toString();
 
 	VariableType type;

@@ -1,4 +1,5 @@
 #include "Variable.h"
+#include <iostream>
 
 Variable::Variable()
 {
@@ -22,6 +23,11 @@ Variable::Variable(float value)
 	type = VariableType::P_Float;
 	sValue = "";
 	fValue = value;
+}
+
+Variable::~Variable()
+{
+	//std::cout << "Deconstructing " << std::endl;
 }
 
 std::string Variable::toString()

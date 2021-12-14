@@ -10,6 +10,8 @@ std::string Token::typeToString()
 {
 	if (type == TokenType::T_AssignmentOperator)
 		return "T_AssignmentOperator";
+	if (type == TokenType::T_ArithmeticOperator)
+		return "T_ArithmeticOperator";
 	if (type == TokenType::T_Identifier)
 		return "T_Identifier";
 	if (type == TokenType::T_Number)
@@ -18,6 +20,10 @@ std::string Token::typeToString()
 		return "T_OpenParenthesis";
 	if (type == TokenType::T_CloseParenthesis)
 		return "T_CloseParenthesis";
+	if (type == TokenType::T_OpenSquareBracket)
+		return "T_OpenSquareBracket";
+	if (type == TokenType::T_CloseSquareBracket)
+		return "T_CloseSquareBracket";
 	if (type == TokenType::T_Comma)
 		return "T_Comma";
 	if (type == TokenType::T_String)
