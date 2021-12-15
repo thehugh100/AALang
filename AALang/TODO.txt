@@ -1,4 +1,2 @@
-Cache Tokens on tokenizeLine()
 remove new Variable(), use custom allocator / garbage collector instead with instance counting
 Add immutable types (const)
-Remove new Variable() //null types, return an immutable null that's already stored

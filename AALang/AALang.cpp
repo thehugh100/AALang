@@ -24,8 +24,9 @@
 
 typedef std::vector<std::string> Program;
 
-void loadProgram(std::filesystem::path filepath, Program* p);
-void preParse(const char* data, size_t size, Program* p);
+struct AALang;
+
+void loadProgram(std::filesystem::path filepath, Program* p, AALang* aaLang);
 
 bool isIdentifierChar(char v)
 {
@@ -403,7 +404,7 @@ struct AALang
 				p->pop();
 
 				Program program;
-				loadProgram(path, &program);
+				loadProgram(path, &program, this);
 				for (auto& i : program)
 				{
 					std::shared_ptr<Variable> result = executeLine(i);
@@ -415,11 +416,12 @@ struct AALang
 
 	std::shared_ptr<Variable> call(std::string identifier)
 	{
-		if (functions.find(identifier) != functions.end())
+		auto toCall = functions.find(identifier);
+		if (toCall != functions.end())
 		{
-			if (!callStack.empty() || functions.at(identifier)->parameterCount == 0)
+			if (!callStack.empty() || toCall->second->parameterCount == 0)
 			{
-				return functions.at(identifier)->execute(&callStack);
+				return toCall->second->execute(&callStack);
 			}
 			else
 			{
@@ -464,7 +466,6 @@ struct AALang
 		return newVar;
 	}
 
-	//TODO: cache this
 	void tokenizeLine(std::string line, TokenList* list)
 	{
 		std::string currentValue;
@@ -590,10 +591,21 @@ struct AALang
 	std::shared_ptr<Variable> executeBlock(std::string block)
 	{
 		std::shared_ptr<Variable> ret = nullptr;
-		Program t;
-		preParse(block.c_str(), block.size(), &t);
+		Program *t;
 
-		for (auto& i : t)
+		if (preParseCache.find(block) == preParseCache.end())
+		{
+			t = new Program;
+			preParseCache[block] = t;
+		}
+		else
+		{
+			t = preParseCache[block];
+		}
+
+		preParse(block, block.size(), t);
+
+		for (auto& i : *t)
 		{
 			ret = executeLine(i);
 		}
@@ -870,61 +882,62 @@ struct AALang
 		return ret;
 	}
 
+	void preParse(std::string data, size_t size, Program* p)
+	{
+		int blockCount = 0;
+		int inQuote = 0;
+
+		p->push_back("");
+		for (int i = 0; i < size; ++i)
+		{
+			if (!inQuote)
+			{
+				if (size - i > 1)
+				{
+					if (data[i] == '/' && data[i + 1] == '/')
+					{
+						while (data[++i] != '\n');
+					}
+				}
+
+				if (data[i] == '{')
+					blockCount++;
+				else if (data[i] == '}')
+					blockCount--;
+			}
+
+			if (data[i] == '"')
+				inQuote = !inQuote;
+
+			if (data[i] != '\n' && data[i] != '\r')
+			{
+				p->back() += data[i];
+			}
+
+			if (data[i] == ';' && !inQuote && blockCount == 0)
+				p->push_back("");
+		}
+		p->pop_back();
+		if (blockCount != 0)
+		{
+			std::cout << "PreParse Error: Block mismatch" << std::endl;
+		}
+	}
+
 	std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
 
 	bool isInForeach;
 	std::shared_ptr<Variable> value;
 	std::shared_ptr<Variable> null;
 
+	std::map<std::string, Program*> preParseCache;
 	std::map<std::string, TokenList*> tokenCache;
 	CallStack callStack;
 	std::map<std::string, Function*> functions;
 	std::map<std::string, std::shared_ptr<Variable>> variables;
 };
 
-void preParse(const char *data, size_t size, Program* p)
-{
-	int blockCount = 0;
-	int inQuote = 0;
-
-	p->push_back("");
-	for (int i = 0; i < size; ++i)
-	{
-		if (!inQuote)
-		{
-			if (size - i > 1)
-			{
-				if (data[i] == '/' && data[i + 1] == '/')
-				{
-					while (data[++i] != '\n');
-				}
-			}
-
-			if (data[i] == '{')
-				blockCount++;
-			else if (data[i] == '}')
-				blockCount--;
-		}
-
-		if (data[i] == '"')
-			inQuote = !inQuote;
-		
-		if (data[i] != '\n' && data[i] != '\r')
-		{
-			p->back() += data[i];
-		}
-
-		if (data[i] == ';' && !inQuote && blockCount == 0)
-			p->push_back("");
-	}
-	p->pop_back();
-	if (blockCount != 0)
-	{
-		std::cout << "PreParse Error: Block mismatch" << std::endl;
-	}
-}
-
-void loadProgram(std::filesystem::path filepath, Program *p)
+void loadProgram(std::filesystem::path filepath, Program *p, AALang* aaLang)
 {
 	if (!std::filesystem::exists(filepath))
 	{
@@ -954,7 +967,7 @@ void loadProgram(std::filesystem::path filepath, Program *p)
 	file.read(data, size);
 	file.close();
 
-	preParse(data, size, p);
+	aaLang->preParse(std::string(data, size), size, p);
 }
 
 int main()
@@ -962,7 +975,7 @@ int main()
 	AALang* aaLang = new AALang();
 
 	Program program;
-	loadProgram("test.aal", &program);
+	loadProgram("test.aal", &program, aaLang);
 
 	int lineNum = 1;
 	for (auto& i : program)
